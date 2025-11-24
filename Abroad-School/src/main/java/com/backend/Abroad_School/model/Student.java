@@ -51,6 +51,20 @@ public class Student {
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Document> documents;
 
+ @ManyToOne(fetch = FetchType.EAGER)
+@JoinColumn(name = "fee_plan_id")
+private FeePlan feePlan;
+private int lateFee ;
+public void addLateFee(double fee) {
+        this.lateFee += fee;
+    }
+
+    public int getLateFee() {
+        return lateFee;
+    }
+
+    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+private List<Voucher> vouchers;
 
 
 }

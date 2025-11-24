@@ -4,6 +4,8 @@ import com.backend.Abroad_School.dto.StudentDTO;
 import com.backend.Abroad_School.model.Student;
 import com.backend.Abroad_School.service.StudentService;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpHeaders;
 
 import org.springframework.http.MediaType;
@@ -58,11 +60,8 @@ public class StudentController {
  
     }
 @PostMapping("/{id}/admission-voucher")
-public ResponseEntity<byte[]> generateAdmissionVoucher(
-        @PathVariable Long id,
-        @RequestBody Map<String, Double> fees
-) {
-    byte[] pdfBytes = studentService.generateAdmissionVoucher(id, fees);
+public ResponseEntity<byte[]> generateAdmissionVoucher(@PathVariable Long id) {
+    byte[] pdfBytes = studentService.generateAdmissionVoucher(id);
 
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_PDF);
@@ -72,6 +71,16 @@ public ResponseEntity<byte[]> generateAdmissionVoucher(
             .headers(headers)
             .body(pdfBytes);
 }
+
+@PostMapping("/student/{sid}/assign-plan/{pid}")
+public Student assignPlan(@PathVariable Long sid, @PathVariable Long pid) {
+    return studentService.assignFeePlan(sid, pid);
+}
+
+
+
+
+
 
 
 }

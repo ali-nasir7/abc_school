@@ -26,8 +26,8 @@ public class Payment {
     private FeePlan feePlan;
 
     private double amountPaid;
-    private double discount = 0;
-    private double lateFee = 0;
+    private double discount ;
+    private double lateFee ;
 
     private LocalDate paymentDate;
 }

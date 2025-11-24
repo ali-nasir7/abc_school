@@ -29,5 +29,8 @@ public class FeePlan {
     private List<FeeHead> feeHeads;
 
     private boolean monthly; // true = monthly, false = one-time
+    @OneToMany(mappedBy = "feePlan")
+private List<Student> students;
+
 }   
 

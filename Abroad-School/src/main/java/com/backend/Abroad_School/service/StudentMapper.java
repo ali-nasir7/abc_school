@@ -58,6 +58,7 @@ public class StudentMapper {
         student.setGrNumber(dto.getGrNumber());
         student.setRollNumber(dto.getRollNumber());
         student.setStudentStatus(dto.getStudentStatus());
+        dto.setFeePlanId(student.getFeePlan() != null ? student.getFeePlan().getId() : null);
         return student;
     }
 }

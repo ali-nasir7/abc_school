@@ -14,9 +14,10 @@ public interface StudentService {
     Student getByGrNumber(String grNumber);
     List<Student> searchByName(String q);
 
-    
+    Student assignFeePlan(Long studentId, Long feePlanId);
     String storeDocument(Long studentId, MultipartFile file, String type);
+    
 
-   public byte[] generateAdmissionVoucher(Long studentId, Map<String, Double> fees);
-
+   //public byte[] generateAdmissionVoucher(Long studentId, Map<String, Double> fees);
+    public byte[] generateAdmissionVoucher(Long studentId);
 }

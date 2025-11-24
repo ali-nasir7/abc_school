@@ -1,11 +1,7 @@
 package com.backend.Abroad_School.model;
 
-
-
 import jakarta.persistence.*;
 import lombok.*;
-
-import java.time.LocalDate;
 
 @Entity
 @Getter
@@ -13,7 +9,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class LedgerEntry {
+public class LateFeeCharge {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,12 +18,7 @@ public class LedgerEntry {
     @ManyToOne
     private Student student;
 
-    private double totalDue;
-    private double totalPaid;
-    private double balance;
-
-    private LocalDate lastPaymentDate;
-
-    
+    // store month-year like "2025-11"
+    @Column(nullable = false)
+    private String monthYear;
 }
-
