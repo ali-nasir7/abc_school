@@ -46,7 +46,7 @@ public class Student {
     private String bFormNumber;
 
     @Enumerated(EnumType.STRING)
-    private StudentStatus studentStatus;
+    private StudentStatus studentStatus = StudentStatus.ACTIVE;
 
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Document> documents;

@@ -1,11 +1,14 @@
 package com.backend.Abroad_School.controller;
 
 import com.backend.Abroad_School.dto.StudentDTO;
+import com.backend.Abroad_School.exception.ResourceNotFoundException;
 import com.backend.Abroad_School.model.Student;
+import com.backend.Abroad_School.model.StudentStatus;
+import com.backend.Abroad_School.repository.LedgerRepository;
+import com.backend.Abroad_School.repository.StudentRepository;
 import com.backend.Abroad_School.service.StudentService;
 
-import jakarta.validation.Valid;
-
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 
 import org.springframework.http.MediaType;
@@ -13,17 +16,24 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
+
 
 @RestController
 @RequestMapping("/api/students")
 public class StudentController {
 
     private final StudentService studentService;
+    private final StudentRepository studentRepository;
+    private final LedgerRepository ledgerRepository;
 
-    public StudentController(StudentService studentService) {
+    public StudentController(StudentService studentService, StudentRepository studentRepository, LedgerRepository ledgerRepository) {
         this.studentService = studentService;
+        this.studentRepository = studentRepository;
+        this.ledgerRepository = ledgerRepository;
     }
 
     @PostMapping("/create")
@@ -78,9 +88,42 @@ public Student assignPlan(@PathVariable Long sid, @PathVariable Long pid) {
 }
 
 
+@PutMapping("/student/{id}/status")
+public ResponseEntity<Student> changeStatus(@PathVariable Long id, @RequestParam StudentStatus status) {
+    Student student = studentRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + id));
+    student.setStudentStatus(status);
+    return ResponseEntity.ok(studentRepository.save(student));
+}
 
 
+@GetMapping("/admissions/report")
+public ResponseEntity<List<Student>> getAdmissionReport(
+        @RequestParam(required = false) String className,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end
+) {
+    List<Student> students;
+    if (className != null && start != null && end != null) {
+        students = studentRepository.findByClassNameAndAdmissionDateBetween(className, start, end);
+    } else if (className != null) {
+        students = studentRepository.findByClassName(className);
+    } else if (start != null && end != null) {
+        students = studentRepository.findByAdmissionDateBetween(start, end);
+    } else {
+        students = studentRepository.findAll();
+    }
+    return ResponseEntity.ok(students);
+}
 
 
+@GetMapping("/student/{studentId}/due")
+public ResponseEntity<BigDecimal> getStudentDue(@PathVariable Long studentId) {
+    Student student = studentRepository.findById(studentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentId));
+
+    BigDecimal totalDue = ledgerRepository.calculateTotalDueForStudent(student);
+    return ResponseEntity.ok(totalDue);
+}
 
 }

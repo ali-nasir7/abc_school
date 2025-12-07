@@ -17,14 +17,13 @@ public class FeeController {
 
     private final FeeHeadService feeHeadService;
     private final PaymentService paymentService;
-    private final StudentService studentService;
+    
 
     public FeeController(FeeHeadService feeHeadService,
-                         PaymentService paymentService,
-                         StudentService studentService) {
+                         PaymentService paymentService) {
         this.feeHeadService = feeHeadService;
         this.paymentService = paymentService;
-        this.studentService = studentService;
+        
     }
 
     

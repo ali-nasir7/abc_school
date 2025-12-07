@@ -37,88 +37,70 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public Payment makePayment(Payment payment) {
+public Payment makePayment(Payment payment) {
+    payment.setPaymentDate(LocalDate.now());
+    Payment saved = paymentRepository.save(payment);
 
-        if (payment.getStudent() == null) {
-            throw new IllegalArgumentException("No Student found!");
-        }
+    double planSum = 0;
 
+    if (payment.getFeePlan() != null && payment.getFeePlan().getFeeHeads() != null) {
+        System.out.println("Fee Plan: " + payment.getFeePlan());
+        System.out.println("Fee Heads: " + payment.getFeePlan().getFeeHeads());
       
-        payment.setPaymentDate(LocalDate.now());
-
-       
-        Payment saved = paymentRepository.save(payment);
-
-        Student student = saved.getStudent();
-        LedgerEntry ledger = ledgerRepository.findByStudent(student);
-
-        
-        double planTotal = 0.0;
-        FeePlan plan = saved.getFeePlan();
-
-        if (plan != null && plan.getFeeHeads() != null) {
-            planTotal = plan.getFeeHeads().stream().mapToDouble(FeeHead::getAmount).sum();
-        } else if (student.getFeePlan() != null && student.getFeePlan().getFeeHeads() != null) {
-            planTotal = student.getFeePlan().getFeeHeads().stream().mapToDouble(FeeHead::getAmount).sum();
-        }
-
-       
-        Double discount = saved.getDiscount() > 0 ? saved.getDiscount() : 0.0;
-
-       
-        if (ledger == null) {
-            double adjustedTotalDue = Math.max(0.0, planTotal - discount);
-
-            ledger = LedgerEntry.builder()
-                    .student(student)
-                    .totalDue(adjustedTotalDue)
-                    .totalPaid(saved.getAmountPaid())
-                    .balance(Math.max(0.0, adjustedTotalDue - saved.getAmountPaid()))
-                    .lastPaymentDate(LocalDate.now())
-                    .build();
-        } else {
-      
-            if (discount > 0) {
-                ledger.setTotalDue(Math.max(0.0, ledger.getTotalDue() - discount));
-            }
-
-        
-            ledger.setTotalPaid(ledger.getTotalPaid() + saved.getAmountPaid());
-
-           
-            ledger.setBalance(Math.max(0.0, ledger.getTotalDue() - ledger.getTotalPaid()));
-
-            ledger.setLastPaymentDate(LocalDate.now());
-        }
-
-        ledgerRepository.save(ledger);
-        return saved;
+        planSum = payment.getFeePlan().getFeeHeads().stream()
+                .mapToDouble(FeeHead::getAmount).sum();
+    } else {
+        System.out.println("Fee Plan or Fee Heads are missing!");
     }
 
-    @Override
-    @Transactional
-    public Payment makePayment(PaymentRequest request) {
+    // Retrieve the ledger for the student
+    LedgerEntry ledger = ledgerRepository.findByStudent(payment.getStudent());
 
-        Student student = studentRepository.findById(request.getStudentId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Student not found: " + request.getStudentId()
-                ));
-
-        FeePlan feePlan = feePlanRepository.findById(request.getFeePlanId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "FeePlan not found: " + request.getFeePlanId()
-                ));
-
-        Payment payment = new Payment();
-        payment.setStudent(student);
-        payment.setFeePlan(feePlan);
-        payment.setAmountPaid(request.getAmountPaid());
-        payment.setDiscount(request.getDiscount()); 
-        payment.setLateFee(0.0);
-        payment.setPaymentDate(LocalDate.now());
-
-        return makePayment(payment);
+    if (ledger == null) {
+        // If no ledger exists, create a new one
+        ledger = LedgerEntry.builder()
+                .student(payment.getStudent())
+                .totalPaid(payment.getAmountPaid())
+                .totalDue(planSum)
+                .balance(planSum - payment.getAmountPaid())
+                .lastPaymentDate(LocalDate.now())
+                .build();
+    } else {
+        // Update existing ledger
+        ledger.setTotalPaid(ledger.getTotalPaid() + payment.getAmountPaid());
+        ledger.setBalance(ledger.getBalance() - payment.getAmountPaid());
+        ledger.setLastPaymentDate(LocalDate.now());
     }
+
+    // Save the updated ledger entry
+    ledgerRepository.save(ledger);
+
+    // Return the saved payment object
+    return saved;
+}
+
+    
+@Override
+@Transactional
+public Payment makePayment(PaymentRequest request) {
+    Student student = studentRepository.findById(request.getStudentId())
+            .orElseThrow(() -> new RuntimeException("Student not found: " + request.getStudentId()));
+
+    FeePlan feePlan = feePlanRepository.findById(request.getFeePlanId())
+            .orElseThrow(() -> new RuntimeException("FeePlan not found: " + request.getFeePlanId()));
+
+    Payment payment = new Payment();
+    payment.setStudent(student);
+    payment.setFeePlan(feePlan);
+    payment.setAmountPaid(request.getAmountPaid());
+    payment.setDiscount(request.getDiscount());
+    payment.setLateFee(0);
+    payment.setPaymentDate(LocalDate.now());
+
+    Payment saved = makePayment(payment); 
+    return saved;
+}
+
 
     @Override
     public List<Payment> getPaymentsForStudent(Long studentId) {

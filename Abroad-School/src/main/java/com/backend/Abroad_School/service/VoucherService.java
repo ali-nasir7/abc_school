@@ -6,16 +6,33 @@ import java.util.List;
 
 public interface VoucherService {
    
-    void applyLateFeesForAllPendingStudents();
+    // void applyLateFeesForAllPendingStudents();
 
   
+    // byte[] generateVoucherPDF(Long voucherId);
+
+    // Voucher createVoucher(Voucher voucher);
+
+    // Voucher markVoucherPaid(Long voucherId);
+    
+   
+    // List<Voucher> getAllUnpaidVouchers();
+    // void saveVoucher(Voucher voucher);
+
+    void applyLateFeesForAllPendingStudents();
+
+    
     byte[] generateVoucherPDF(Long voucherId);
 
     Voucher createVoucher(Voucher voucher);
 
     Voucher markVoucherPaid(Long voucherId);
+
     
-   
     List<Voucher> getAllUnpaidVouchers();
+
+   
+    List<Voucher> getUnpaidVouchersByStudent(Long studentId);
+
     void saveVoucher(Voucher voucher);
 }

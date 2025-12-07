@@ -5,8 +5,12 @@ import com.backend.Abroad_School.model.Student;
 import com.backend.Abroad_School.repository.LedgerRepository;
 import com.backend.Abroad_School.repository.StudentRepository;
 import com.backend.Abroad_School.exception.ResourceNotFoundException;
-import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 
 @RestController
 @RequestMapping("/api/ledger")
@@ -30,4 +34,11 @@ public class LedgerController {
         }
         return ledger;
     }
+
+    @GetMapping("/all")
+public ResponseEntity<List<LedgerEntry>> getFullLedger() {
+    List<LedgerEntry> ledgerEntries = ledgerRepository.findAll();
+    return ResponseEntity.ok(ledgerEntries);
+}
+
 }

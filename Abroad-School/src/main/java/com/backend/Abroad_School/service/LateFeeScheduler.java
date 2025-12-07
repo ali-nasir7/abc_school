@@ -2,8 +2,7 @@ package com.backend.Abroad_School.service;
 
 import com.backend.Abroad_School.model.*;
 import com.backend.Abroad_School.repository.*;
-import com.backend.Abroad_School.service.NotificationService;
-import com.backend.Abroad_School.service.VoucherService;
+
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +29,7 @@ public class LateFeeScheduler {
     private final NotificationService notificationService;
     private final VoucherRepository voucherRepository;
 
-    @Value("${school.latefee.amount}")
+    @Value("${school.latefee.amount:500}")
     private double LATE_FEE_AMOUNT;
 
     @Scheduled(cron = "0 0 2 * * ?") // daily at 2 AM

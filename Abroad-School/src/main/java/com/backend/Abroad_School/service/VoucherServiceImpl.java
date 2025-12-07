@@ -1,28 +1,26 @@
 package com.backend.Abroad_School.service;
 
-import com.backend.Abroad_School.dto.PaymentRequest;
-import com.backend.Abroad_School.model.FeePlan;
-import com.backend.Abroad_School.model.LedgerEntry;
-import com.backend.Abroad_School.model.Payment;
-import com.backend.Abroad_School.model.Student;
-import com.backend.Abroad_School.model.Voucher;
-import com.backend.Abroad_School.repository.LedgerRepository;
-import com.backend.Abroad_School.repository.PaymentRepository;
-import com.backend.Abroad_School.repository.VoucherRepository;
+import com.backend.Abroad_School.model.*;
+import com.backend.Abroad_School.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
+
 
 @Service
 @RequiredArgsConstructor
 public class VoucherServiceImpl implements VoucherService {
 
+    private static final Logger logger = LoggerFactory.getLogger(VoucherServiceImpl.class);
+
     private final VoucherRepository voucherRepository;
-    private final StudentService studentService; 
-    private final PDFService pdfService; 
+    private final PDFService pdfService;
     private final LedgerRepository ledgerRepository;
     private final PaymentRepository paymentRepository;
     private final NotificationService notificationService;
@@ -35,55 +33,74 @@ public class VoucherServiceImpl implements VoucherService {
     }
 
     @Override
+    public List<Voucher> getUnpaidVouchersByStudent(Long studentId) {
+        if (studentId == null) {
+            // Defensive: if null, return empty list (scheduler should call getAllUnpaidVouchers instead)
+            return Collections.emptyList();
+        }
+        return voucherRepository.findUnpaidVouchersByStudent(studentId);
+    }
+
+    @Override
     @Transactional
     public void applyLateFeesForAllPendingStudents() {
         List<Voucher> pending = voucherRepository.findAllUnpaidVouchers();
         LocalDate today = LocalDate.now();
 
         for (Voucher v : pending) {
-            if (v == null || v.getDueDate() == null || !today.isAfter(v.getDueDate()) || v.isLateFeeApplied())
-                continue;
+            try {
+                if (v == null) continue;
+                if (v.getDueDate() == null || !today.isAfter(v.getDueDate())) continue;
+                if (v.isLateFeeApplied()) continue;
 
-            // Apply late fee
-            int lateFee = DEFAULT_LATE_FEE;
-            v.setLateFee(lateFee);
-            v.setTotalAmount(v.getTotalAmount() + lateFee);
-            v.setLateFeeApplied(true);
+                // get late fee amount either from voucher (if set) or default
+                int lateFee = (v.getLateFee() > 0) ? v.getLateFee() : DEFAULT_LATE_FEE;
 
-            // Ledger update
-            Student st = v.getStudent();
-            if (st != null) {
-                LedgerEntry ledger = ledgerRepository.findByStudent(st);
-                if (ledger == null) {
-                    ledger = LedgerEntry.builder()
-                            .student(st)
-                            .totalDue(v.getTotalAmount())
-                            .totalPaid(0)
-                            .balance(v.getTotalAmount())
-                            .lastPaymentDate(null)
-                            .build();
-                } else {
-                    ledger.setTotalDue(ledger.getTotalDue() + lateFee);
-                    ledger.setBalance(ledger.getBalance() + lateFee);
+                v.setLateFee(lateFee);
+                v.setTotalAmount(v.getTotalAmount() + lateFee);
+                v.setLateFeeApplied(true);
+
+                // Ledger update
+                Student st = v.getStudent();
+                if (st != null) {
+                    LedgerEntry ledger = ledgerRepository.findByStudent(st);
+                    if (ledger == null) {
+                        ledger = LedgerEntry.builder()
+                                .student(st)
+                                .totalDue(v.getTotalAmount())
+                                .totalPaid(0.0)
+                                .balance(v.getTotalAmount())
+                                .lastPaymentDate(null)
+                                .build();
+                    } else {
+                        ledger.setTotalDue(ledger.getTotalDue() + lateFee);
+                        ledger.setBalance(ledger.getBalance() + lateFee);
+                    }
+                    ledgerRepository.save(ledger);
                 }
-                ledgerRepository.save(ledger);
-            }
 
-            // Regenerate PDF using PDFService
-            try {
-                byte[] pdf = pdfService.generateAdmissionVoucherPDF(st.getId());
-                v.setPdfFile(pdf);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+                // Regenerate PDF if student present
+                if (st != null && st.getId() != null) {
+                    try {
+                        byte[] pdf = pdfService.generateAdmissionVoucherPDF(st.getId());
+                        v.setPdfFile(pdf);
+                    } catch (Exception e) {
+                        logger.error("Failed to regenerate PDF for voucher {} (student {}): {}", v.getId(), (st != null ? st.getId() : null), e.getMessage(), e);
+                    }
+                }
 
-            voucherRepository.save(v);
+                // Persist voucher update
+                voucherRepository.save(v);
 
-            // Notify parent
-            try {
-                notificationService.sendLateFeeNotificationToParent(v);
-            } catch (Exception e) {
-                e.printStackTrace();
+                // Notify parent (voucher-level)
+                try {
+                    notificationService.sendLateFeeNotificationToParent(v);
+                } catch (Exception e) {
+                    logger.error("Failed to send late fee notification for voucher {}: {}", v.getId(), e.getMessage(), e);
+                }
+            } catch (Exception ex) {
+                // Keep processing other vouchers even if one fails
+                logger.error("Error processing pending voucher id {}: {}", v != null ? v.getId() : null, ex.getMessage(), ex);
             }
         }
     }
@@ -105,25 +122,20 @@ public class VoucherServiceImpl implements VoucherService {
         Student s = voucher.getStudent();
         FeePlan plan = s.getFeePlan();
         if (plan != null) {
-            double totalAmount = plan.getFeeHeads().stream()
-                    .mapToDouble(fh -> fh.getAmount())
-                    .sum();
-            // Apply discount if exists
-            if (voucher.getDiscount() > 0) {
-                totalAmount -= voucher.getDiscount();
-            }
+            double totalAmount = plan.getFeeHeads().stream().mapToDouble(FeeHead::getAmount).sum();
+            if (voucher.getDiscount() > 0) totalAmount -= voucher.getDiscount();
             voucher.setTotalAmount(totalAmount);
         }
 
         Voucher saved = voucherRepository.save(voucher);
 
-        // update
+        // ledger update
         LedgerEntry ledger = ledgerRepository.findByStudent(s);
         if (ledger == null) {
             ledger = LedgerEntry.builder()
                     .student(s)
                     .totalDue(saved.getTotalAmount())
-                    .totalPaid(0)
+                    .totalPaid(0.0)
                     .balance(saved.getTotalAmount())
                     .lastPaymentDate(null)
                     .build();
@@ -161,14 +173,14 @@ public class VoucherServiceImpl implements VoucherService {
             if (ledger == null) {
                 ledger = LedgerEntry.builder()
                         .student(student)
-                        .totalDue(0)
+                        .totalDue(0.0)
                         .totalPaid(p.getAmountPaid())
-                        .balance(0)
+                        .balance(0.0)
                         .lastPaymentDate(LocalDate.now())
                         .build();
             } else {
                 ledger.setTotalPaid(ledger.getTotalPaid() + p.getAmountPaid());
-                ledger.setBalance(Math.max(0, ledger.getTotalDue() - ledger.getTotalPaid()));
+                ledger.setBalance(Math.max(0.0, ledger.getTotalDue() - ledger.getTotalPaid()));
                 ledger.setLastPaymentDate(LocalDate.now());
             }
             ledgerRepository.save(ledger);
@@ -179,20 +191,18 @@ public class VoucherServiceImpl implements VoucherService {
         try {
             notificationService.sendPaymentReceivedNotificationToParent(v);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Failed to send payment-received notification for voucher {}: {}", v.getId(), e.getMessage(), e);
         }
 
         return v;
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public byte[] generateVoucherPDF(Long voucherId) {
         Voucher voucher = voucherRepository.findById(voucherId)
                 .orElseThrow(() -> new RuntimeException("Voucher not found: " + voucherId));
         if (voucher.getStudent() == null) throw new RuntimeException("Voucher has no student associated");
-
-        // Use PDFService now
         return pdfService.generateAdmissionVoucherPDF(voucher.getStudent().getId());
     }
 
