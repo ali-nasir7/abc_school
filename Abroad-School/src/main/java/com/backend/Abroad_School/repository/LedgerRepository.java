@@ -15,6 +15,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface LedgerRepository extends JpaRepository<LedgerEntry, Long> {
     LedgerEntry findByStudent(Student student);
-    @Query("SELECT SUM(l.amountDue) FROM LedgerEntry l WHERE l.student = :student")
+    @Query("SELECT SUM(l.totalDue) FROM LedgerEntry l WHERE l.student = :student")
 BigDecimal calculateTotalDueForStudent(@Param("student") Student student);
 }

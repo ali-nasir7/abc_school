@@ -9,30 +9,31 @@ public class StudentMapper {
 
     //  Entity → DTO
     public StudentDTO toDto(Student student) {
-        if (student == null) return null;
+    if (student == null) return null;
 
-        return StudentDTO.builder()
-                .id(student.getId())
-                .fullName(student.getFullName())
-                .fatherName(student.getFatherName())
-                .motherName(student.getMotherName())
-                .fatherCnic(student.getFatherCnic())
-                .motherCnic(student.getMotherCnic())
-                .bFormNumber(student.getBFormNumber())
-                .address(student.getAddress())
-                .dateOfBirth(student.getDateOfBirth())
-                .admissionDate(student.getAdmissionDate())
-                .parentContact1(student.getParentContact1())
-                .parentContact2(student.getParentContact2())
-                .previousSchool(student.getPreviousSchool())
-                .className(student.getClassName())
-                .groupName(student.getGroupName())
-                .section(student.getSection())
-                .grNumber(student.getGrNumber())
-                .rollNumber(student.getRollNumber())
-                .studentStatus(student.getStudentStatus())
-                .build();
-    }
+    return StudentDTO.builder()
+            .id(student.getId())
+            .fullName(student.getFullName())
+            .fatherName(student.getFatherName())
+            .motherName(student.getMotherName())
+            .fatherCnic(student.getFatherCnic())
+            .motherCnic(student.getMotherCnic())
+            .studentCnic(student.getStudentCnic())
+            .address(student.getAddress())
+            .dateOfBirth(student.getDateOfBirth())
+            .admissionDate(student.getAdmissionDate())
+            .parentContact1(student.getParentContact1())
+            .parentContact2(student.getParentContact2())
+            .previousSchool(student.getPreviousSchool())
+            .className(student.getClassName())
+            .groupName(student.getGroupName())
+            .section(student.getSection())
+            .grNumber(student.getGrNumber())
+            .rollNumber(student.getRollNumber())
+            .studentStatus(student.getStudentStatus())
+            .feePlanId(student.getFeePlan() != null ? student.getFeePlan().getId() : null) 
+            .build();
+}
 
     //  DTO → Entity
     public Student toEntity(StudentDTO dto) {
@@ -45,7 +46,7 @@ public class StudentMapper {
         student.setMotherName(dto.getMotherName());
         student.setFatherCnic(dto.getFatherCnic());
         student.setMotherCnic(dto.getMotherCnic());
-        student.setBFormNumber(dto.getBFormNumber());
+        student.setStudentCnic(dto.getStudentCnic());
         student.setAddress(dto.getAddress());
         student.setDateOfBirth(dto.getDateOfBirth());
         student.setAdmissionDate(dto.getAdmissionDate());

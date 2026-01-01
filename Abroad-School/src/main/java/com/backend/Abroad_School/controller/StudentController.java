@@ -6,6 +6,7 @@ import com.backend.Abroad_School.model.Student;
 import com.backend.Abroad_School.model.StudentStatus;
 import com.backend.Abroad_School.repository.LedgerRepository;
 import com.backend.Abroad_School.repository.StudentRepository;
+import com.backend.Abroad_School.service.StudentMapper;
 import com.backend.Abroad_School.service.StudentService;
 
 import org.springframework.format.annotation.DateTimeFormat;
@@ -29,11 +30,13 @@ public class StudentController {
     private final StudentService studentService;
     private final StudentRepository studentRepository;
     private final LedgerRepository ledgerRepository;
+    private final StudentMapper studentMapper ;
 
-    public StudentController(StudentService studentService, StudentRepository studentRepository, LedgerRepository ledgerRepository) {
+    public StudentController(StudentService studentService, StudentRepository studentRepository, LedgerRepository ledgerRepository, StudentMapper studentMapper) {
         this.studentService = studentService;
         this.studentRepository = studentRepository;
         this.ledgerRepository = ledgerRepository;
+        this.studentMapper = studentMapper;
     }
 
     @PostMapping("/create")
@@ -43,9 +46,12 @@ public class StudentController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Student> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(studentService.getById(id));
-    }
+public ResponseEntity<StudentDTO> getById(@PathVariable Long id) {
+    return ResponseEntity.ok(
+        studentMapper.toDto(studentService.getById(id))
+    );
+}
+
 
     @GetMapping("/gr/{gr}")
     public ResponseEntity<Student> getByGr(@PathVariable("gr") String gr) {
@@ -54,9 +60,28 @@ public class StudentController {
 
    
     @GetMapping("/search")
-    public ResponseEntity<List<Student>> search(@RequestParam("q") String q) {
-        return ResponseEntity.ok(studentService.searchByName(q));
-    }
+public ResponseEntity<List<StudentDTO>> search(@RequestParam("q") String q) {
+    return ResponseEntity.ok(
+        studentService.searchByName(q)
+            .stream()
+            .map(studentMapper::toDto)
+            .toList()
+    );
+}
+
+    
+    
+ @GetMapping("/all")
+public ResponseEntity<List<StudentDTO>> getAllStudents() {
+    return ResponseEntity.ok(
+        studentRepository.findAll()
+            .stream()
+            .map(studentMapper::toDto)
+            .toList()
+    );
+}
+
+
 
 
     @PostMapping(value = "/{id}/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -82,10 +107,13 @@ public ResponseEntity<byte[]> generateAdmissionVoucher(@PathVariable Long id) {
             .body(pdfBytes);
 }
 
-@PostMapping("/student/{sid}/assign-plan/{pid}")
-public Student assignPlan(@PathVariable Long sid, @PathVariable Long pid) {
-    return studentService.assignFeePlan(sid, pid);
+@PostMapping("/{sid}/assign-plan/{pid}")
+public StudentDTO assignPlan(@PathVariable Long sid, @PathVariable Long pid) {
+    return studentMapper.toDto(
+        studentService.assignFeePlan(sid, pid)
+    );
 }
+
 
 
 @PutMapping("/student/{id}/status")

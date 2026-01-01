@@ -1,6 +1,8 @@
 package com.backend.Abroad_School.dto;
 
 import com.backend.Abroad_School.model.StudentStatus;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -41,7 +43,8 @@ public class StudentDTO {
     private String parentContact1;
     private String parentContact2;
     private String address;
-    private String bFormNumber;
+    
+    private String studentCnic;
     private String grNumber;        
     private Integer rollNumber;      
     private StudentStatus studentStatus;

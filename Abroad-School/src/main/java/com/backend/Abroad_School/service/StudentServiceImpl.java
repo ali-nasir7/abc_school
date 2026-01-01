@@ -64,7 +64,7 @@ public class StudentServiceImpl implements StudentService {
         student.setParentContact1(dto.getParentContact1());
         student.setParentContact2(dto.getParentContact2());
         student.setAddress(dto.getAddress());
-        student.setBFormNumber(dto.getBFormNumber());
+        student.setStudentCnic(dto.getStudentCnic());
         student.setStudentStatus(dto.getStudentStatus() != null ? dto.getStudentStatus() : StudentStatus.ACTIVE);
 
         Student saved = studentRepository.saveAndFlush(student);

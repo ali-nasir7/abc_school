@@ -6,6 +6,10 @@ import lombok.*;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 @Entity
 @Getter
 @Setter
@@ -30,7 +34,9 @@ public class FeePlan {
 
     private boolean monthly; // true = monthly, false = one-time
     @OneToMany(mappedBy = "feePlan")
-private List<Student> students;
+    @JsonManagedReference
+    @JsonIgnore
+   private List<Student> students;
 
 }   
 

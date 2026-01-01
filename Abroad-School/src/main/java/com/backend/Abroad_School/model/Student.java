@@ -5,6 +5,11 @@ import lombok.*;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 @Entity
 @Table(name = "students", indexes = {
         @Index(name = "idx_grnumber", columnList = "grNumber"),
@@ -43,7 +48,8 @@ public class Student {
     private String parentContact1;
     private String parentContact2;
     private String address;
-    private String bFormNumber;
+    
+    private String studentCnic;
 
     @Enumerated(EnumType.STRING)
     private StudentStatus studentStatus = StudentStatus.ACTIVE;
@@ -53,6 +59,8 @@ public class Student {
 
  @ManyToOne(fetch = FetchType.EAGER)
 @JoinColumn(name = "fee_plan_id")
+@JsonBackReference
+
 private FeePlan feePlan;
 private int lateFee ;
 public void addLateFee(double fee) {
