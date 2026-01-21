@@ -13,7 +13,7 @@ public class FeePlanController {
 
     private final FeePlanService feePlanService;
 
-    // ✅ ONLY SERVICE IN CONSTRUCTOR
+    
     public FeePlanController(FeePlanService feePlanService) {
         this.feePlanService = feePlanService;
     }

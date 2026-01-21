@@ -20,6 +20,7 @@ public class LedgerEntry {
     private Long id;
 
     @ManyToOne
+    @JoinColumn(name = "student_id", nullable = false)
     private Student student;
 
     private double totalDue;

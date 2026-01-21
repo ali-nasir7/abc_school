@@ -16,3 +16,4 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
     @Query("SELECT v FROM Voucher v WHERE v.student.id = :studentId AND v.paid = false")
     List<Voucher> findUnpaidVouchersByStudent(@Param("studentId") Long studentId);
 }
+    

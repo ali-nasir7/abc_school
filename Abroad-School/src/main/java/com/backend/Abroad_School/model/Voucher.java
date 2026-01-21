@@ -23,7 +23,7 @@ public class Voucher {
     private Student student;
 
     private double totalAmount;
-    private int lateFee;
+    private double lateFee;
     private LocalDate dueDate;
     private boolean paid = false;
     private boolean lateFeeApplied = false; 
@@ -34,6 +34,6 @@ public class Voucher {
 
     // Store PDF as bytes
     @Lob
-    @Column(name = "voucher_pdf")
+    @Column(name = "voucher_pdf", columnDefinition = "LONGBLOB")
     private byte[] pdfFile;
 }

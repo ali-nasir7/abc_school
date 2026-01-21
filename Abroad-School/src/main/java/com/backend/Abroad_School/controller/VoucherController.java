@@ -1,7 +1,10 @@
 package com.backend.Abroad_School.controller;
 
+import com.backend.Abroad_School.dto.VoucherDTO;
+import com.backend.Abroad_School.dto.VoucherRequest;
 import com.backend.Abroad_School.model.Voucher;
 import com.backend.Abroad_School.service.VoucherService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -11,37 +14,41 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/vouchers")
+@RequiredArgsConstructor
 public class VoucherController {
 
     private final VoucherService voucherService;
 
-    public VoucherController(VoucherService voucherService) {
-        this.voucherService = voucherService;
-    }
-
+    // List unpaid vouchers
     @GetMapping("/unpaid")
-    public ResponseEntity<List<Voucher>> listUnpaidVouchers() {
-        return ResponseEntity.ok(voucherService.getAllUnpaidVouchers());
+    public ResponseEntity<List<VoucherDTO>> listUnpaidVouchers() {
+        List<VoucherDTO> dtos = voucherService
+                .mapListToDTO(voucherService.getAllUnpaidVouchers());
+        return ResponseEntity.ok(dtos);
     }
 
+    // Apply late fees
     @PostMapping("/apply-late-fees")
     public ResponseEntity<String> applyLateFeesNow() {
         voucherService.applyLateFeesForAllPendingStudents();
         return ResponseEntity.ok("Late fees applied (where applicable).");
     }
 
+    // Create voucher
     @PostMapping("/")
-    public ResponseEntity<Voucher> createVoucher(@RequestBody Voucher voucher) {
-        Voucher saved = voucherService.createVoucher(voucher);
-        return ResponseEntity.ok(saved);
+    public ResponseEntity<VoucherDTO> createVoucher(@RequestBody VoucherRequest request) {
+        Voucher saved = voucherService.createVoucher(request);
+        return ResponseEntity.ok(voucherService.mapToDTO(saved));
     }
 
+    // Mark paid
     @PostMapping("/{id}/mark-paid")
-    public ResponseEntity<Voucher> markPaid(@PathVariable Long id) {
+    public ResponseEntity<VoucherDTO> markPaid(@PathVariable Long id) {
         Voucher v = voucherService.markVoucherPaid(id);
-        return ResponseEntity.ok(v);
+        return ResponseEntity.ok(voucherService.mapToDTO(v));
     }
 
+    // Get PDF
     @GetMapping("/{id}/pdf")
     public ResponseEntity<byte[]> getVoucherPdf(@PathVariable Long id) {
         byte[] pdf = voucherService.generateVoucherPDF(id);

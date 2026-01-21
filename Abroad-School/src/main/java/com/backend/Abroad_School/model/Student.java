@@ -62,12 +62,12 @@ public class Student {
 @JsonBackReference
 
 private FeePlan feePlan;
-private int lateFee ;
+private double lateFee ;
 public void addLateFee(double fee) {
         this.lateFee += fee;
     }
 
-    public int getLateFee() {
+    public double getLateFee() {
         return lateFee;
     }
 

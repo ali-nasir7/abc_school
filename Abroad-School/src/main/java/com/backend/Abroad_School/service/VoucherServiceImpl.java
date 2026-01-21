@@ -1,5 +1,7 @@
 package com.backend.Abroad_School.service;
 
+import com.backend.Abroad_School.dto.VoucherDTO;
+import com.backend.Abroad_School.dto.VoucherRequest;
 import com.backend.Abroad_School.model.*;
 import com.backend.Abroad_School.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
-
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,8 +26,9 @@ public class VoucherServiceImpl implements VoucherService {
     private final LedgerRepository ledgerRepository;
     private final PaymentRepository paymentRepository;
     private final NotificationService notificationService;
+    private final StudentRepository studentRepository;
 
-    private static final int DEFAULT_LATE_FEE = 500;
+    private static final double DEFAULT_LATE_FEE = 500.0;
 
     @Override
     public List<Voucher> getAllUnpaidVouchers() {
@@ -34,10 +37,7 @@ public class VoucherServiceImpl implements VoucherService {
 
     @Override
     public List<Voucher> getUnpaidVouchersByStudent(Long studentId) {
-        if (studentId == null) {
-            // Defensive: if null, return empty list (scheduler should call getAllUnpaidVouchers instead)
-            return Collections.emptyList();
-        }
+        if (studentId == null) return Collections.emptyList();
         return voucherRepository.findUnpaidVouchersByStudent(studentId);
     }
 
@@ -49,13 +49,10 @@ public class VoucherServiceImpl implements VoucherService {
 
         for (Voucher v : pending) {
             try {
-                if (v == null) continue;
-                if (v.getDueDate() == null || !today.isAfter(v.getDueDate())) continue;
-                if (v.isLateFeeApplied()) continue;
+                if (v == null || v.getDueDate() == null) continue;
+                if (!today.isAfter(v.getDueDate()) || v.isLateFeeApplied()) continue;
 
-                // get late fee amount either from voucher (if set) or default
-                int lateFee = (v.getLateFee() > 0) ? v.getLateFee() : DEFAULT_LATE_FEE;
-
+                double lateFee = v.getLateFee() > 0 ? v.getLateFee() : DEFAULT_LATE_FEE;
                 v.setLateFee(lateFee);
                 v.setTotalAmount(v.getTotalAmount() + lateFee);
                 v.setLateFeeApplied(true);
@@ -64,42 +61,31 @@ public class VoucherServiceImpl implements VoucherService {
                 Student st = v.getStudent();
                 if (st != null) {
                     LedgerEntry ledger = ledgerRepository.findByStudent(st);
-                    if (ledger == null) {
-                        ledger = LedgerEntry.builder()
-                                .student(st)
-                                .totalDue(v.getTotalAmount())
-                                .totalPaid(0.0)
-                                .balance(v.getTotalAmount())
-                                .lastPaymentDate(null)
-                                .build();
-                    } else {
-                        ledger.setTotalDue(ledger.getTotalDue() + lateFee);
+                    if (ledger != null) {
                         ledger.setBalance(ledger.getBalance() + lateFee);
-                    }
-                    ledgerRepository.save(ledger);
-                }
-
-                // Regenerate PDF if student present
-                if (st != null && st.getId() != null) {
-                    try {
-                        byte[] pdf = pdfService.generateAdmissionVoucherPDF(st.getId());
-                        v.setPdfFile(pdf);
-                    } catch (Exception e) {
-                        logger.error("Failed to regenerate PDF for voucher {} (student {}): {}", v.getId(), (st != null ? st.getId() : null), e.getMessage(), e);
+                        ledger.setTotalDue(ledger.getTotalDue() + lateFee);
+                        ledgerRepository.save(ledger);
                     }
                 }
 
-                // Persist voucher update
+                // Regenerate PDF
+                try {
+                    byte[] pdf = pdfService.generateVoucherPDF(v);
+                    v.setPdfFile(pdf);
+                } catch (Exception e) {
+                    logger.error("Failed to regenerate PDF for voucher {}: {}", v.getId(), e.getMessage(), e);
+                }
+
                 voucherRepository.save(v);
 
-                // Notify parent (voucher-level)
+                // Notify parent
                 try {
                     notificationService.sendLateFeeNotificationToParent(v);
                 } catch (Exception e) {
                     logger.error("Failed to send late fee notification for voucher {}: {}", v.getId(), e.getMessage(), e);
                 }
+
             } catch (Exception ex) {
-                // Keep processing other vouchers even if one fails
                 logger.error("Error processing pending voucher id {}: {}", v != null ? v.getId() : null, ex.getMessage(), ex);
             }
         }
@@ -107,29 +93,32 @@ public class VoucherServiceImpl implements VoucherService {
 
     @Override
     @Transactional
-    public Voucher createVoucher(Voucher voucher) {
-        if (voucher.getStudent() == null) {
-            throw new RuntimeException("Voucher must be associated with a Student");
-        }
+    public Voucher createVoucher(VoucherRequest request) {
+        Student s = studentRepository.findById(request.getStudentId())
+                .orElseThrow(() -> new RuntimeException("Student not found: " + request.getStudentId()));
 
-        if (voucher.getDueDate() == null) {
-            voucher.setDueDate(LocalDate.now().plusDays(10));
-        }
+        Voucher voucher = Voucher.builder()
+                .student(s)
+                .discount(request.getDiscount() != null ? request.getDiscount() : 0.0)
+                .lateFee(request.getLateFee() != null ? request.getLateFee() : 0.0)
+                .dueDate(request.getDueDate() != null ? request.getDueDate() : LocalDate.now().plusDays(10))
+                .paid(false)
+                .lateFeeApplied(false)
+                .createdAt(LocalDate.now())
+                .build();
 
-        voucher.setCreatedAt(LocalDate.now());
-        voucher.setPaid(false);
-
-        Student s = voucher.getStudent();
+        // Compute totalAmount from FeePlan
         FeePlan plan = s.getFeePlan();
-        if (plan != null) {
-            double totalAmount = plan.getFeeHeads().stream().mapToDouble(FeeHead::getAmount).sum();
-            if (voucher.getDiscount() > 0) totalAmount -= voucher.getDiscount();
-            voucher.setTotalAmount(totalAmount);
-        }
+        double total = plan != null && plan.getFeeHeads() != null ?
+                plan.getFeeHeads().stream().mapToDouble(FeeHead::getAmount).sum() : 0.0;
+
+        double discount = Math.max(0.0, voucher.getDiscount());
+        total = Math.max(0.0, total - discount);
+        voucher.setTotalAmount(total);
 
         Voucher saved = voucherRepository.save(voucher);
 
-        // ledger update
+        // Ledger update
         LedgerEntry ledger = ledgerRepository.findByStudent(s);
         if (ledger == null) {
             ledger = LedgerEntry.builder()
@@ -144,6 +133,15 @@ public class VoucherServiceImpl implements VoucherService {
             ledger.setBalance(ledger.getBalance() + saved.getTotalAmount());
         }
         ledgerRepository.save(ledger);
+
+        // Generate PDF
+        try {
+            byte[] pdf = pdfService.generateVoucherPDF(saved);
+            saved.setPdfFile(pdf);
+            voucherRepository.save(saved);
+        } catch (Exception e) {
+            logger.error("Failed to generate PDF for voucher {}: {}", saved.getId(), e.getMessage(), e);
+        }
 
         return saved;
     }
@@ -203,11 +201,29 @@ public class VoucherServiceImpl implements VoucherService {
         Voucher voucher = voucherRepository.findById(voucherId)
                 .orElseThrow(() -> new RuntimeException("Voucher not found: " + voucherId));
         if (voucher.getStudent() == null) throw new RuntimeException("Voucher has no student associated");
-        return pdfService.generateAdmissionVoucherPDF(voucher.getStudent().getId());
+        return pdfService.generateVoucherPDF(voucher);
     }
 
     @Override
     public void saveVoucher(Voucher voucher) {
         voucherRepository.save(voucher);
+    }
+
+    @Override
+    public VoucherDTO mapToDTO(Voucher voucher) {
+        return new VoucherDTO(
+                voucher.getId(),
+                voucher.getDiscount(),
+                voucher.getDueDate(),
+                voucher.getLateFee(),
+                voucher.isPaid(),
+                voucher.getStudent().getId(),
+                voucher.getTotalAmount()
+        );
+    }
+
+    @Override
+    public List<VoucherDTO> mapListToDTO(List<Voucher> vouchers) {
+        return vouchers.stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 }
