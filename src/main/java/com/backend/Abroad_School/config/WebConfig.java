@@ -5,20 +5,20 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@Configuration
-public class WebConfig implements WebMvcConfigurer {
+//@Configuration
+public class WebConfig /*implements WebMvcConfigurer */{
 
-    private final SimpleAuthInterceptor simpleAuthInterceptor;
+    // private final SimpleAuthInterceptor simpleAuthInterceptor;
 
-    @Autowired
-    public WebConfig(SimpleAuthInterceptor simpleAuthInterceptor) {
-        this.simpleAuthInterceptor = simpleAuthInterceptor;
-    }
+    // @Autowired
+    // public WebConfig(SimpleAuthInterceptor simpleAuthInterceptor) {
+    //     this.simpleAuthInterceptor = simpleAuthInterceptor;
+    // }
 
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(simpleAuthInterceptor)
-                .addPathPatterns("/**");
-    }
+    // @Override
+    // public void addInterceptors(InterceptorRegistry registry) {
+    //     registry.addInterceptor(simpleAuthInterceptor)
+    //             .addPathPatterns("/**");
+    // }
 }
 

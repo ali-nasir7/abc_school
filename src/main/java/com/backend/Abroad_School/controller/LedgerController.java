@@ -40,5 +40,9 @@ public ResponseEntity<List<LedgerEntry>> getFullLedger() {
     List<LedgerEntry> ledgerEntries = ledgerRepository.findAll();
     return ResponseEntity.ok(ledgerEntries);
 }
+// @GetMapping("Montly_collection")
+// public ResponseEntity<List<LedgerEntry>> getMonthlyCollection(){
+//     list<LedgerEntry> ledgerEntries = ledgerRepository.
+// }
 
 }
