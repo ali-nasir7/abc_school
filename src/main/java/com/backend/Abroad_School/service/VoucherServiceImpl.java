@@ -90,60 +90,82 @@ public class VoucherServiceImpl implements VoucherService {
     }
 
     @Override
-    @Transactional
-    public Voucher createVoucher(VoucherRequest request) {
-        Student s = studentRepository.findById(request.getStudentId())
-                .orElseThrow(() -> new RuntimeException("Student not found: " + request.getStudentId()));
+@Transactional
+public Voucher createVoucher(VoucherRequest request) {
 
-        Voucher voucher = Voucher.builder()
-                .student(s)
-                .discount(request.getDiscount() != null ? request.getDiscount() : 0.0)
-                .lateFee(request.getLateFee() != null ? request.getLateFee() : 0.0)
-                .dueDate(request.getDueDate() != null ? request.getDueDate() : LocalDate.now().plusDays(10))
-                .paid(false)
-                .lateFeeApplied(false)
-                .createdAt(LocalDate.now())
-                .build();
+    LocalDate today = LocalDate.now(); // ✅ FIX: missing variable
 
-      
-        FeePlan plan = s.getFeePlan();
-        double total = plan != null && plan.getFeeHeads() != null ?
-                plan.getFeeHeads().stream().mapToDouble(FeeHead::getAmount).sum() : 0.0;
+    Student s = studentRepository.findById(request.getStudentId())
+            .orElseThrow(() -> new RuntimeException(
+                    "Student not found: " + request.getStudentId()
+            ));
 
-        double discount = Math.max(0.0, voucher.getDiscount());
-        total = Math.max(0.0, total - discount);
-        voucher.setTotalAmount(total);
+    Voucher voucher = Voucher.builder()
+            .student(s)
+            .discount(request.getDiscount() != null ? request.getDiscount() : 0.0)
+            .lateFee(request.getLateFee() != null ? request.getLateFee() : 0.0)
+            .dueDate(request.getDueDate() != null ? request.getDueDate() : today.plusDays(10))
+            .paid(false)
+            .lateFeeApplied(false)
+            .createdAt(today)
+            .voucherMonth(today.getMonthValue())   // ✅ FIXED
+            .voucherYear(today.getYear())          // ✅ FIXED
+            .build();
 
-        Voucher saved = voucherRepository.save(voucher);
+    // -------------------- FEE CALCULATION --------------------
+    FeePlan plan = s.getFeePlan();
 
-   
-        LedgerEntry ledger = ledgerRepository.findByStudent(s);
-        if (ledger == null) {
-            ledger = LedgerEntry.builder()
-                    .student(s)
-                    .totalDue(saved.getTotalAmount())
-                    .totalPaid(0.0)
-                    .balance(saved.getTotalAmount())
-                    .lastPaymentDate(null)
-                    .build();
-        } else {
-            ledger.setTotalDue(ledger.getTotalDue() + saved.getTotalAmount());
-            ledger.setBalance(ledger.getBalance() + saved.getTotalAmount());
-        }
-        ledgerRepository.save(ledger);
+    double total = 0.0;
 
-  
-        try {
-            byte[] pdf = pdfService.generateVoucherPDF(saved);
-            saved.setPdfFile(pdf);
-            voucherRepository.save(saved);
-        } catch (Exception e) {
-            logger.error("Failed to generate PDF for voucher {}: {}", saved.getId(), e.getMessage(), e);
-        }
-
-        return saved;
+    if (plan != null && plan.getFeeHeads() != null) {
+        total = plan.getFeeHeads()
+                .stream()
+                .mapToDouble(FeeHead::getAmount)
+                .sum();
     }
 
+    double discount = Math.max(0.0, voucher.getDiscount());
+    total = Math.max(0.0, total - discount);
+
+    voucher.setTotalAmount(total);
+
+    // -------------------- SAVE VOUCHER --------------------
+    Voucher saved = voucherRepository.save(voucher);
+
+    // -------------------- LEDGER UPDATE --------------------
+    LedgerEntry ledger = ledgerRepository.findByStudent(s);
+
+    if (ledger == null) {
+        ledger = LedgerEntry.builder()
+                .student(s)
+                .totalDue(saved.getTotalAmount())
+                .totalPaid(0.0)
+                .balance(saved.getTotalAmount())
+                .lastPaymentDate(null)
+                .build();
+    } else {
+        ledger.setTotalDue(ledger.getTotalDue() + saved.getTotalAmount());
+        ledger.setBalance(ledger.getBalance() + saved.getTotalAmount());
+    }
+
+    ledgerRepository.save(ledger);
+
+    // -------------------- PDF GENERATION --------------------
+    try {
+        byte[] pdf = pdfService.generateVoucherPDF(saved);
+        saved.setPdfFile(pdf);
+        voucherRepository.save(saved);
+    } catch (Exception e) {
+        logger.error(
+                "Failed to generate PDF for voucher {}: {}",
+                saved.getId(),
+                e.getMessage(),
+                e
+        );
+    }
+
+    return saved;
+}
     @Override
     @Transactional
     public Voucher markVoucherPaid(Long voucherId) {
